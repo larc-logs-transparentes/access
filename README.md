@@ -20,8 +20,8 @@ Performance tests for Election Transparency prototype, a project to increase tra
 In each machine, clone the repository and install the dependencies
 
 ```bash
-git clone https://github.com/larc-logs-transparentes/cose.git
-cd cose
+git clone https://github.com/larc-logs-transparentes/access.git
+cd access
 bash ./setup.sh
 ```
 
@@ -60,7 +60,7 @@ On another machine, install the dependencies and run the tests. For 50 samples, 
 
 ```bash
 # activate the Python virtual environment. 
-cd cose/
+cd access/
 source .venv/bin/activate
 
 #  Run the tests. Substitute the <Logserver-IP> with the IP of the LogServer.
@@ -93,7 +93,7 @@ On another machine, install the dependencies and run the tests. For 50 samples, 
 
 ```bash
 # activate the Python virtual environment. 
-cd cose/
+cd access/
 source .venv/bin/activate
 
 #  Run the tests. Substitute the <Logserver-IP> with the IP of the LogServer.

@@ -19,12 +19,12 @@
 
 
 ## Install other dependencies
-  sudo apt install -y python3.10-venv
+  sudo apt install -y python3.12-venv
   sudo apt-get install -y unzip
 
 ## Init Python Virtual environment and install dependencies 
 
-  sudo apt install -y python3.10-venv
+  sudo apt install -y python3.12-venv
 
   python3 -m venv .venv
   source .venv/bin/activate
