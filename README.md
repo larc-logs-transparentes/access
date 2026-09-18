@@ -1,23 +1,46 @@
-# Election Transparency
+# Election Transparency — Prototype and Performance Evaluation
 
-Performance tests for Election Transparency prototype, a project to increase transparency in elections.
+This repository contains the prototype and the reproducibility scripts for the paper:
 
+> L. Kimura, G. Fumagali, Y. R. Venturini, M. A. Simplicio Jr. **Election Transparency: Improving Post-election Auditability with Transparency Logs.** . [Link to article]
 
+Election Transparency is an ecosystem for registering, publishing and collaboratively verifying electoral data using **transparency logs** (append-only Merkle trees). Its goal is not to verify voting machines, but to make any alteration, omission or equivocation of electoral data *after* it leaves the voting machines detectable by any interested party — even when the Election Authority itself is under suspicion.
 
-[Link to article]
+The scripts here reproduce the two experiments reported in the paper:
 
-## 📦 Requirements
+| Experiment | Paper | What it measures |
+|---|---|---|
+| Operations performance | Table II | Inclusion proof, consistency proof and tree rebuild times for local trees of 1K to 1M leaves |
+| 2022 Brazilian elections | Table III, Fig. 8 | Download, verification, pre-processing and independent tally of all 472,027 poll tapes (772 MB) from the 2022 Brazilian general election |
 
-- 1 Ubuntu machine to act as the LogServer
-  - Tested environment:  DO-Premium-AMD, 2vCPU, 8GB RAM, Ubuntu 22.04 LTS, Docker version 27.3.1, Python 3.10.12
-- 1 Ubuntu machine to act as the Client
-  - Tested environment:  Intel Xeon Platinum 8168, 2vCPU, 4GB RAM, Ubuntu 22.04 LTS, Docker version 27.3.1, Python 3.10.12
+## Repository structure
 
+```
+access/
+├── logserver/                        # Log Server (TLManager, Backend, Frontend), via Docker Compose
+│   ├── populate_operation_performance/   # Builds synthetic trees for Table II
+│   └── populate_2022_election/           # Inserts the 2022 poll tapes for Table III
+├── client/                           # Verifier / Monitor / Auditor scripts (TLverifier, TLScripts)
+│   ├── test_verifications.py             # Table II measurements
+│   ├── test_analysis.py                  # Table III measurements
+│   └── calculate_2022_results.py         # Independent tally of the 2022 presidential election
+└── setup.sh                          # Installs dependencies
+```
 
+The Log Server stores the electoral data and maintains the transparency logs (one *local tree* per data type plus a *global tree* of local roots). The client scripts play the roles of Verifier (inclusion proofs), Monitor (consistency proofs) and Auditor (tree rebuild and independent tally), as described in Sections IV and VI of the paper.
+
+## Requirements
+
+Two Ubuntu machines are recommended, so that network transfer between Log Server and client is accounted for as in the paper. A single machine also works for the demo.
+
+- **Log Server** — tested on DigitalOcean Premium AMD, 2 vCPU, 8 GB RAM, Ubuntu 22.04 LTS, Docker 27.3.1, Python 3.10.12
+- **Client** — tested on Intel Xeon Platinum 8168, 2 vCPU, 4 GB RAM, Ubuntu 22.04 LTS, Docker 27.3.1, Python 3.10.12
+
+These configurations were deliberately modest: the paper's claim is that any interested party can act as Verifier or Monitor on a commodity computer.
 
 ## Setup
 
-In each machine, clone the repository and install the dependencies
+On each machine, clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/larc-logs-transparentes/access.git
@@ -25,11 +48,9 @@ cd access
 bash ./setup.sh
 ```
 
+## Quick demo
 
-
-## Demo execution
-
-A fast demo execution. It will instantiate the Election Transparency modules and populate them with 74 poll tapes from the 2022 Brazilian Election. The user interface can be accessed through the browser in localhost:3000, and it communicates with the backend through port 8080.
+Starts all Election Transparency modules and populates them with 74 poll tapes from the 2022 Brazilian election. The web interface is served at `http://localhost:3000` and talks to the backend on port `8080`.
 
 ```bash
 cd logserver
@@ -38,13 +59,13 @@ sleep 10
 docker run --rm --network host --pull always ghcr.io/larc-logs-transparentes/bu-utils:gh-73
 ```
 
+In the interface, search for a polling station and open a poll tape; the check mark on the top right indicates that its inclusion proof was verified client-side (Fig. 8a in the paper).
 
-## Test operations performance
+## Experiment 1 — Operations performance (Table II)
 
-Evaluate the performance of the main verifications in Election Transparency (Table II).
+Measures inclusion verification, consistency verification and tree rebuild for local trees of 1K, 10K, 100K, 500K and 1M leaves, with the global tree sized as `m = n / 2048`.
 
-##### Log Server
-Create the trees with 1k, 10k, 100k, 500k, and 1M of leaves. It takes ~2 hours in the tested environment.
+**Log Server** — builds the five trees. Takes ~2 h on the tested environment.
 
 ```bash
 cd logserver
@@ -55,26 +76,31 @@ cd populate_operation_performance
 bash ./start.sh
 ```
 
-##### Client
-On another machine, install the dependencies and run the tests. For 50 samples, it takes ~50 minutes on the tested environment.  Wait for the LogServer to create all trees.
+**Client** — run on the other machine after all trees have been created. With 50 samples, takes ~50 min.
 
 ```bash
-# activate the Python virtual environment. 
 cd access/
 source .venv/bin/activate
 
-#  Run the tests. Substitute the <Logserver-IP> with the IP of the LogServer.
 cd client
 LOGSERVER_IP=<LOGSERVER-IP> python3 test_verifications.py --sample_size=50
 ```
 
+Expected results (median; see paper for details):
 
-## Test with 2022 Brazilian presidential elections 
+| Local tree | Verify inclusion | Verify consistency | Rebuild tree |
+|---|---|---|---|
+| 1K | 0.11 ms | 14 ms | 0.02 s |
+| 10K | 0.11 ms | 14 ms | 0.22 s |
+| 100K | 0.12 ms | 15 ms | 2.9 s |
+| 500K | 0.12 ms | 24 ms | 17 s |
+| 1M | 0.12 ms | 43 ms | 36 s |
 
-Recalculate the results of the 2022 Brazilian presidential elections using published poll tapes. Evaluate the performance of analysis operations (Table III).
+## Experiment 2 — 2022 Brazilian general election (Table III)
 
-##### Log Server
-Populate the LogServer with the ~500k poll tapes from the 2022 elections. It takes ~18 hours on the tested environment.
+Inserts all poll tapes published by the Brazilian election authority for the 2022 general election, then measures the four steps of the Auditor procedure (download, verify, pre-process, tally) and recomputes the presidential result.
+
+**Log Server** — inserts the ~472K poll tapes. Takes ~18 h on the tested environment.
 
 ```bash
 # Reset docker compose state
@@ -83,31 +109,34 @@ docker compose down
 docker compose up -d
 sleep 10
 
-# start script
 cd populate_2022_election
 bash ./start.sh
 ```
 
-##### Client
-On another machine, install the dependencies and run the tests. For 50 samples, it takes ~5 hrs on the tested environment. Wait for the LogServer to insert all poll tapes.
+**Client** — run on the other machine after all poll tapes have been inserted. With 50 samples, takes ~5 h.
 
 ```bash
-# activate the Python virtual environment. 
 cd access/
 source .venv/bin/activate
 
-#  Run the tests. Substitute the <Logserver-IP> with the IP of the LogServer.
 cd client
 LOGSERVER_IP=<LOGSERVER-IP> python3 test_analysis.py --sample_size=50
 ```
 
-To print the results of 2022 Brazilian Elections, run the following script. It takes ~10min on the tested environment.
+Expected results (median): download 1.7 min · verify 25 s · pre-process 3.4 min · tally 31 s.
+
+**Independent tally** — prints the recomputed results of the 2022 presidential election (Fig. 8b). Takes ~10 min.
 
 ```bash
-#  Substitute the <Logserver-IP> with the IP of the LogServer.
 LOGSERVER_IP=<LOGSERVER-IP> python3 calculate_2022_results.py
 ```
 
+The output should match the official results published by the TSE. Note that this reproduces the *tabulation* stage from the published poll tapes; it does not, and is not meant to, attest to the correctness of the poll tapes themselves (see Section VI-B of the paper).
 
+## Data source
 
+Poll tapes (*Boletins de Urna*) are downloaded from the TSE open data portal: https://dadosabertos.tse.jus.br/
 
+## Acknowledgments
+
+This work was supported in part by Ripple's University Blockchain Research Initiative; CNPq (grant 307732/2023-1); CAPES (Finance Code 001); and FAPESP (grants 2021/00199-8 and 2024/06106-0).
